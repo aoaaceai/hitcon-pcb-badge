@@ -31,11 +31,6 @@ class ModNum {
   uint64_t mod;
 };
 
-struct DivByZero {
-  DivByZero(uint64_t dividend);
-  uint64_t dividend;
-};
-
 struct EllipticCurve {
   EllipticCurve(const uint64_t A, const uint64_t B);
   const uint64_t A, B;
@@ -155,9 +150,10 @@ class EcLogic {
   callback_t callback;
   void *callback_arg1;
 
-  Task signTask;
-  Task verifyTask;
+  service::sched::Task signTask;
+  service::sched::Task verifyTask;
 };
+
 extern EcLogic g_ec_logic;
 
 }  // namespace hitcon

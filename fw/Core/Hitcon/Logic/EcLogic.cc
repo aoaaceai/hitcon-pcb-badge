@@ -3,12 +3,22 @@
 #include <Service/Sched/Scheduler.h>
 
 using namespace hitcon::service::sched;
+using namespace hitcon::ecc;
 
 namespace hitcon {
+
+EcLogic g_ec_logic;
 
 namespace ecc {
 
 #define UINT64_MSB (1ULL << 63)
+
+static const EllipticCurve g_curve(0x8a0e7f5440493e74, 0xb141f82791169843);
+static const EcPoint g_generator({0x634292ecef8422b7, 0xc574fde5ac5aad25},
+                                 {0x9b9aaf6b43cc9330, 0xc574fde5ac5aad25});
+static const uint64_t g_curveOrder = 0xc574fde54141edc9;
+// TODO: use GetPerBoardSecret to set the private key
+static const uint64_t g_privateKey = 87;
 
 constexpr inline uint64_t modneg(const uint64_t x, const uint64_t m) {
   return m - (x % m);
@@ -48,7 +58,6 @@ uint64_t extgcd(uint64_t ppr, uint64_t pr) {
   uint64_t ppx = 1;
   uint64_t px = 0;
   while (pr != 1) {
-    if (pr == 0) throw DivByZero(ppr);
     uint64_t q = ppr / pr;
     uint64_t r = ppr % pr;
     uint64_t x = modsub(ppx, modmul(q, px, m), m);
@@ -109,8 +118,6 @@ bool ModNum::operator==(const ModNum &other) const {
 
 bool ModNum::operator==(const uint64_t other) const { return val == other; }
 
-DivByZero::DivByZero(uint64_t dividend) : dividend(dividend) {}
-
 EllipticCurve::EllipticCurve(const uint64_t A, const uint64_t B) : A(A), B(B) {}
 
 EcPoint::EcPoint() : x{0, 0}, y{0, 0}, isInf(true) {}
@@ -166,12 +173,7 @@ EcPoint EcPoint::intersect(const EcPoint &other, const ModNum &l) const {
   return EcPoint(newx, newy);
 }
 
-static const EllipticCurve g_curve(0x8a0e7f5440493e74, 0xb141f82791169843);
-static const EcPoint g_generator({0x634292ecef8422b7, 0xc574fde5ac5aad25},
-                                 {0x9b9aaf6b43cc9330, 0xc574fde5ac5aad25});
-static const uint64_t g_curveOrder = 0xc574fde54141edc9;
-// TODO: use GetPerBoardSecret to set the private key
-static const uint64_t g_privateKey = 87;
+}  // namespace ecc
 
 uint64_t computeHash(uint8_t const *message, uint32_t len) {
   // TODO: call the sha3 api
@@ -183,6 +185,7 @@ uint64_t getRandValue() {
   return 0xdeadbeefcafebabe;
 }
 
+// TODO: determine the lifetime of the message and len
 bool EcLogic::StartSign(uint8_t const *message, uint32_t len,
                         callback_t callback, void *callbackArg1) {
   if (busy) return false;
@@ -243,8 +246,8 @@ EcLogic::EcLogic()
       verifyTask(800, (task_callback_t)&EcLogic::doVerify,
                  (void *)&g_ec_logic) {}
 
-void EcLogic::Init() {}
-
-}  // namespace ecc
+void EcLogic::Init() {
+  // TODO: initialize the private key here maybe?
+}
 
 }  // namespace hitcon
