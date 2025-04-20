@@ -26,6 +26,7 @@ class ModNum {
   ModNum operator/(const ModNum &other) const;
   bool operator==(const ModNum &other) const;
   bool operator==(const uint64_t other) const;
+  bool operator!=(const ModNum &other) const;
 
   uint64_t val;
   uint64_t mod;
@@ -49,6 +50,14 @@ class EcPoint {
    * Getter for the x-coordinate.
    */
   uint64_t xval() const;
+  /**
+   * Whether the point is the identity element.
+   */
+  bool identity() const;
+  /**
+   * Whether this point is on a given curve.
+   */
+  bool onCurve(const EllipticCurve &curve) const;
 
  private:
   ModNum x, y;

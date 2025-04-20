@@ -120,6 +120,10 @@ bool ModNum::operator==(const ModNum &other) const {
   return val == other.val && mod == other.mod;
 }
 
+bool ModNum::operator!=(const ModNum &other) const {
+  return val != other.val || mod != other.mod;
+}
+
 bool ModNum::operator==(const uint64_t other) const { return val == other; }
 
 EllipticCurve::EllipticCurve(const uint64_t A, const uint64_t B) : A(A), B(B) {}
@@ -166,6 +170,13 @@ bool EcPoint::operator==(const EcPoint &other) const {
 
 uint64_t EcPoint::xval() const { return x.val; }
 
+bool EcPoint::identity() const { return isInf; }
+
+bool EcPoint::onCurve(const EllipticCurve &curve) const {
+  return x.mod == y.mod &&
+         x * x * x + curve.A * x + ModNum(curve.B, x.mod) == y * y;
+}
+
 EcPoint EcPoint::twice() const {
   ModNum l = (3 * x * x + ModNum(g_curve.A, x.mod)) / (2 * y);
   return intersect(*this, l);
@@ -211,6 +222,7 @@ bool EcLogic::StartVerify(uint8_t const *message, uint32_t len,
   this->callback_arg1 = callbackArg1;
   this->savedMessage = message;
   this->savedMessageLen = len;
+  this->tmpSignature = signature;
   return true;
 }
 
@@ -234,12 +246,24 @@ void EcLogic::doSign(void *unused) {
 }
 
 void EcLogic::doVerify(void *unused) {
-  ModNum z(computeHash(savedMessage, savedMessageLen), g_curveOrder);
-  ModNum u1 = z / ModNum(tmpSignature.s, g_curveOrder);
-  ModNum u2 = ModNum(tmpSignature.r, g_curveOrder) /
-              ModNum(tmpSignature.s, g_curveOrder);
-  EcPoint P = g_generator * u1.val + tmpSignature.pub * u2.val;
-  bool isValid = P.xval() == tmpSignature.r;
+  bool isValid = true;
+
+  if (!tmpSignature.pub.onCurve(g_curve)) isValid = false;
+
+  if (isValid && tmpSignature.pub.identity()) isValid = false;
+
+  if (isValid && (tmpSignature.pub * g_curveOrder).identity() == false)
+    isValid = false;
+
+  if (isValid) {
+    ModNum z(computeHash(savedMessage, savedMessageLen), g_curveOrder);
+    ModNum u1 = z / ModNum(tmpSignature.s, g_curveOrder);
+    ModNum u2 = ModNum(tmpSignature.r, g_curveOrder) /
+                ModNum(tmpSignature.s, g_curveOrder);
+    EcPoint P = g_generator * u1.val + tmpSignature.pub * u2.val;
+    isValid = P.xval() == tmpSignature.r;
+  }
+
   callback(callback_arg1, (void *)isValid);
   busy = false;
 }
