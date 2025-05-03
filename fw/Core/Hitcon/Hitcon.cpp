@@ -32,6 +32,7 @@
 
 using namespace hitcon;
 using namespace hitcon::ecc;
+using namespace hitcon::hash;
 using namespace hitcon::service::sched;
 using namespace hitcon::service::xboard;
 
@@ -56,7 +57,7 @@ void hitcon_run() {
   display_init();
   g_noise_source.Init();
   g_entropy_hub.Init();
-  g_hash_service.Init();
+  // g_hash_service.Init();
   g_fast_random_pool.Init();
   g_secure_random_pool.Init();
   g_ec_logic.Init();

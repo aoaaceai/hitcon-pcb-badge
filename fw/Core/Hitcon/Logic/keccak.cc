@@ -183,6 +183,29 @@ void sha3_UpdateWord(void *priv, void const *bufIn) {
   }
 }
 
+int sha3_UpdateWord_split(void *priv, void const *bufIn, int round) {
+  sha3_context *ctx = (sha3_context *)priv;
+
+  if (round == 0) {
+    const uint64_t *t = reinterpret_cast<const uint64_t *>(bufIn);
+
+    ctx->u.s[ctx->wordIndex] ^= *t;
+    if (++ctx->wordIndex ==
+        (SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords))) {
+      return 1;
+    }
+  } else { /* 1 <= round <= KECCAK_ROUNDS */
+    keccakf_split(ctx->u.s, round - 1);
+
+    if (round == KECCAK_ROUNDS) {
+      ctx->wordIndex = 0;
+      return 0;
+    } else {
+      return round + 1;
+    }
+  }
+}
+
 void sha3_Update(void *priv, void const *bufIn, size_t len) {
   sha3_context *ctx = (sha3_context *)priv;
 
