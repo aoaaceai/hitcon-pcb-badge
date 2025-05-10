@@ -18,7 +18,7 @@ namespace internal {
 struct HashStatus {
   size_t progress;
   int round;
-  enum state { update, finalize, done } state;
+  enum state { kUpdateState, kFinalizeState, kDoneState } state;
 
   HashStatus();
   void Init();

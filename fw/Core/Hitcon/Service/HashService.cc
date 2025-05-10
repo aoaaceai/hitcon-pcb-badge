@@ -13,7 +13,13 @@ HashService g_hash_service;
 
 namespace internal {
 
-HashStatus::HashStatus() : progress(0), round(0), state(update) {}
+HashStatus::HashStatus() { Init(); }
+
+void HashStatus::Init() {
+  progress = 0;
+  round = 0;
+  state = kUpdateState;
+}
 
 void HashStatus::NewState(enum state state) {
   this->state = state;
@@ -51,13 +57,13 @@ bool HashService::StartHash(uint8_t const *message, size_t len,
 
 void HashService::doHash(void *unused) {
   switch (status.state) {
-    case status.update:
+    case status.kUpdateState:
       doHashUpdate();
       break;
-    case status.finalize:
+    case status.kFinalizeState:
       doHashFinalize();
       break;
-    case status.done:
+    case status.kDoneState:
       doHashDone();
       break;
   }
@@ -74,7 +80,7 @@ void HashService::doHashUpdate() {
   }
 
   if (status.progress == serviceContext.len) {
-    status.NewState(status.finalize);
+    status.NewState(status.kFinalizeState);
   }
 }
 
@@ -83,7 +89,7 @@ void HashService::doHashFinalize() {
   if (++status.round == KECCAK_ROUNDS + 2) {
     result.digest = digest;
     result.size = SHA3_BIT_SIZE / 8;
-    status.NewState(status.done);
+    status.NewState(status.kDoneState);
   }
 }
 
