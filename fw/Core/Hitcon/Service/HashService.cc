@@ -45,10 +45,7 @@ void HashService::Init() { scheduler.Queue(&hashTask, nullptr); }
 bool HashService::StartHash(uint8_t const *message, size_t len,
                             callback_t callback, void *callbackArg1) {
   if (hashTask.IsEnabled()) return false;
-  // TODO: remove this restriction. HashService should support messages of all
-  // sizes.
-  if (len % 8) return false;
-  hashTask.Enable();
+  scheduler.EnablePeriodic(&hashTask);
   status.Init();
   serviceContext.Init(message, len, callback, callbackArg1);
   sha3_Init(&sha3Context, SHA3_BIT_SIZE);
@@ -70,17 +67,28 @@ void HashService::doHash(void *unused) {
 }
 
 void HashService::doHashUpdate() {
+  size_t i;
+  uint64_t word;
   // TODO: the performance of UpdateWord can be optimized.
   // sha3_UpdateWord_split often does a "fast return", so we can analyze how
   // much each "fast return" takes, and do multiple of them each round.
-  status.round = sha3_UpdateWord_split(
-      &sha3Context, serviceContext.message + status.progress, status.round);
-  if (status.round == 0) {
-    status.progress += 8;
-  }
-
-  if (status.progress == serviceContext.len) {
+  if (status.progress + 8 > serviceContext.len) {
+    // final block, needs padding
+    sha3_UpdateFinalWord(&sha3Context, serviceContext.message + status.progress,
+                         serviceContext.len - status.progress);
     status.NewState(status.kFinalizeState);
+  } else {
+    // just do this block without padding
+    status.round = sha3_UpdateWord_split(
+        &sha3Context, serviceContext.message + status.progress, status.round);
+
+    if (status.round == 0) {
+      status.progress += 8;
+    }
+
+    if (status.progress >= serviceContext.len) {
+      status.NewState(status.kFinalizeState);
+    }
   }
 }
 
@@ -95,7 +103,7 @@ void HashService::doHashFinalize() {
 
 void HashService::doHashDone() {
   serviceContext.callback(serviceContext.callbackArg1, &result);
-  hashTask.Disable();
+  scheduler.DisablePeriodic(&hashTask);
 }
 
 HashService::HashService()

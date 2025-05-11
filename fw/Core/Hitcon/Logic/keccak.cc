@@ -191,9 +191,10 @@ int sha3_UpdateWord_split(void *priv, void const *bufIn, int round) {
 
     ctx->u.s[ctx->wordIndex] ^= *t;
     if (++ctx->wordIndex ==
-        (SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords))) {
+        (SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords)))
       return 1;
-    }
+    else
+      return 0;
   } else { /* 1 <= round <= KECCAK_ROUNDS */
     keccakf_split(ctx->u.s, round - 1);
 
@@ -204,6 +205,18 @@ int sha3_UpdateWord_split(void *priv, void const *bufIn, int round) {
       return round + 1;
     }
   }
+}
+
+void sha3_UpdateFinalWord(void *priv, void const *bufIn, size_t len) {
+  size_t i;
+  sha3_context *ctx = (sha3_context *)priv;
+  const uint8_t *buf = reinterpret_cast<const uint8_t *>(bufIn);
+
+  SHA3_ASSERT(len < 8);
+
+  /* endian-independent code follows: */
+  for (i = 0; i < len; i++) ctx->saved |= ((uint64_t)buf[i]) << (i * 8);
+  ctx->byteIndex = len;
 }
 
 void sha3_Update(void *priv, void const *bufIn, size_t len) {
