@@ -12,11 +12,41 @@ namespace game {
 constexpr uint8_t PRIVATE_KEY_SRC_PREFIX[] = {'2', '0', '2', '5',
                                               'P', 'R', 'I', 'V'};
 
+enum EventType : uint8_t {
+  kNone = 0,
+  kSnake = 1,
+  kTetris = 2,
+  kDino = 3,
+  kShake = 16
+};
+
+struct SingleBadgeActivity {
+  EventType eventType;
+  uint8_t eventData[3];
+};
+
+struct TwoBadgeActivity {
+  EventType gameType;
+  uint8_t otherUser[hitcon::ir::IR_USERNAME_LEN];
+  uint16_t myScore;
+  uint16_t otherScore;
+  uint16_t nonce;
+};
+
+struct Proximity {
+  uint8_t power;
+  uint16_t nonce;
+};
+
 class GameController {
  public:
   GameController();
 
   void Init();
+
+  bool SendTwoBadgeActivity(const TwoBadgeActivity &data);
+  bool SendProximity(const Proximity &data);
+  bool SendSingleBadgeActivity(const SingleBadgeActivity &data);
 
  private:
   /*
@@ -36,8 +66,13 @@ class GameController {
   bool TrySendPubAnnounce();
   void OnPrivKeyHashFinish(void *arg2);
   void RoutineFunc();
+  /**
+   * Copy the username into the specified buffer. Buffer should be at least
+   * IR_USERNAME_LEN in size. This function does not perform any size checks!
+   * Caller is expected to do so.
+   */
+  void GetUsername(uint8_t *buf);
 };
-enum GameType : uint8_t { kNone, kSnake, kTetris };
 
 }  // namespace game
 

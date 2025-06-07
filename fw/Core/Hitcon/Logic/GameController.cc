@@ -4,6 +4,7 @@
 #include <Logic/IrController.h>
 #include <Service/HashService.h>
 #include <Service/PerBoardData.h>
+#include <Service/SignedPacketService.h>
 
 #include <cstring>
 
@@ -23,12 +24,61 @@ void GameController::Init() {
   hitcon::service::sched::scheduler.EnablePeriodic(&routine_task);
 }
 
+bool GameController::SendTwoBadgeActivity(const TwoBadgeActivity &data) {
+  hitcon::ir::TwoBadgeActivityPacket packet;
+  GetUsername(packet.user1);
+  memcpy(packet.user2, data.otherUser, hitcon::ir::IR_USERNAME_LEN);
+  // Game Type: byte 0 bits 0:4
+  packet.game_data[0] = data.gameType & 0xf;
+  // Player 1 Score: byte 0 bits 4:8, byte 1 bits 0:6
+  packet.game_data[0] |= (data.myScore & 0xf) << 4;
+  packet.game_data[1] = (data.myScore & 0x3f0) >> 4;
+  // Player 2 Score: byte 1 bits 6:8, byte 2 bits 0:8
+  packet.game_data[1] |= (data.otherScore & 0x3) << 6;
+  packet.game_data[2] = (data.otherScore & 0x3fc) >> 2;
+  // Nonce: byte 3, byte 4
+  *reinterpret_cast<uint16_t *>(&packet.game_data[3]) = data.nonce;
+  return g_signed_packet_service.SignAndSendData(
+      packet_type::kTwoBadgeActivity, reinterpret_cast<uint8_t *>(&packet),
+      sizeof(packet) - ECC_SIGNATURE_SIZE);
+}
+
+bool GameController::SendProximity(const Proximity &data) {
+  hitcon::ir::ProximityPacket packet;
+  GetUsername(packet.user);
+  packet.power = data.power;
+  static_assert(sizeof(packet.nonce) == sizeof(data.nonce));
+  memcpy(packet.nonce, &data.nonce, sizeof(packet.nonce));
+  return g_signed_packet_service.SignAndSendData(
+      packet_type::kProximity, reinterpret_cast<uint8_t *>(&packet),
+      sizeof(packet) - ECC_SIGNATURE_SIZE);
+}
+
+bool GameController::SendSingleBadgeActivity(const SingleBadgeActivity &data) {
+  hitcon::ir::SingleBadgeActivityPacket packet;
+  GetUsername(packet.user);
+  packet.event_type = data.eventType;
+  static_assert(sizeof(packet.event_data) == sizeof(data.eventData));
+  memcpy(packet.event_data, data.eventData, sizeof(packet.event_data));
+  return g_signed_packet_service.SignAndSendData(
+      packet_type::kSingleBadgeActivity, reinterpret_cast<uint8_t *>(&packet),
+      sizeof(packet) - ECC_SIGNATURE_SIZE);
+}
+
 void GameController::OnPrivKeyHashFinish(void *arg2) {
   uint8_t *ptr = reinterpret_cast<uint8_t *>(arg2);
   uint64_t privkey;
   memcpy(&privkey, ptr, sizeof(uint64_t));
   hitcon::ecc::g_ec_logic.SetPrivateKey(privkey);
   state_ = 3;
+}
+
+void GameController::GetUsername(uint8_t *buf) {
+  // TODO: We use the first few bytes of pubkey as username for now.
+  // If needed, hash the public key to get a more unique identifier.
+  uint8_t pubkey[ECC_PUBKEY_SIZE];
+  hitcon::ecc::g_ec_logic.GetPublicKey(pubkey);
+  memcpy(buf, pubkey, hitcon::ir::IR_USERNAME_LEN);
 }
 
 bool GameController::TrySendPubAnnounce() {
