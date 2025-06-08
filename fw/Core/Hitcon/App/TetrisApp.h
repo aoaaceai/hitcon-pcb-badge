@@ -14,10 +14,11 @@ namespace app {
 
 namespace tetris {
 
-enum {  // XBOARD
+enum XboardPacketType : uint8_t {  // XBOARD
   PACKET_ATTACK = 1,
   PACKET_GAME_START,
   PACKET_GAME_OVER,
+  PACKET_GAME_OVER_ACK,
   PACKET_ABORT_GAME,
 };
 
@@ -49,6 +50,14 @@ class TetrisApp : public App {
   hitcon::service::sched::PeriodicTask periodic_task;
 
   void RecvAttackPacket(hitcon::service::xboard::PacketCallbackArg *packet);
+
+  uint16_t savedNonce;
+
+  void SendGameOver();
+  void SendGameOverAck(hitcon::service::xboard::PacketCallbackArg *packet);
+  void UploadSingleplayerScore();
+  void UploadMultiplayerScore(
+      hitcon::service::xboard::PacketCallbackArg *packet);
 
  public:
   TetrisApp();

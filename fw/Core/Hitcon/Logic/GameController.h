@@ -49,6 +49,12 @@ class GameController {
   bool SendSingleBadgeActivity(const SingleBadgeActivity &data);
 
   void NotifyPubkeyAck();
+  /**
+   * Copy the username into the specified buffer. Buffer should be at least
+   * IR_USERNAME_LEN in size. This function does not perform any size checks!
+   * Caller is expected to do so.
+   */
+  void GetUsername(uint8_t *buf);
 
  private:
   /*
@@ -70,12 +76,6 @@ class GameController {
   bool TrySendPubAnnounce();
   void OnPrivKeyHashFinish(void *arg2);
   void RoutineFunc();
-  /**
-   * Copy the username into the specified buffer. Buffer should be at least
-   * IR_USERNAME_LEN in size. This function does not perform any size checks!
-   * Caller is expected to do so.
-   */
-  void GetUsername(uint8_t *buf);
 };
 
 }  // namespace game

@@ -5,7 +5,9 @@
 #include <App/ShowScoreApp.h>
 #include <Logic/BadgeController.h>
 #include <Logic/Display/display.h>
+#include <Logic/GameController.h>
 #include <Logic/GameScore.h>
+#include <Logic/IrController.h>
 #include <Logic/RandomPool.h>
 #include <Logic/XBoardLogic.h>
 #include <Service/Sched/SysTimer.h>
@@ -86,16 +88,90 @@ void TetrisApp::OnXboardRecv(void *arg) {
 
     case PACKET_GAME_OVER:
       game.game_force_over();
-
+      if (multiplayer) {
+        SendGameOverAck(packet);
+        UploadMultiplayerScore(packet);
+      }
       show_score_app.SetScore(game.game_get_score());
       g_game_score.MarkScore(GameScoreType::GAME_TETRIS, game.game_get_score());
       badge_controller.change_app(&show_score_app);
+      break;
+    case PACKET_GAME_OVER_ACK:
+      if (multiplayer) UploadMultiplayerScore(packet);
       break;
 
     case PACKET_ABORT_GAME:
       badge_controller.BackToMenu(this);
       break;
   }
+}
+
+struct __attribute__((packed)) GameOverPacket {
+  XboardPacketType packetType;
+  uint16_t score;
+  uint8_t username[hitcon::ir::IR_USERNAME_LEN];
+  uint16_t nonce;
+};
+
+static_assert(sizeof(GameOverPacket) ==
+              sizeof(XboardPacketType) + sizeof(uint16_t) +
+                  hitcon::ir::IR_USERNAME_LEN + sizeof(uint16_t));
+
+void TetrisApp::SendGameOver() {
+  GameOverPacket packet = {
+      .packetType = XboardPacketType::PACKET_GAME_OVER,
+      .score = game.game_get_score(),
+      .nonce = savedNonce = g_fast_random_pool.GetRandom()};
+  g_game_controller.GetUsername(packet.username);
+  g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&packet),
+                                sizeof(packet), TETRIS_RECV_ID);
+}
+
+void TetrisApp::SendGameOverAck(PacketCallbackArg *packet) {
+  if (packet->len != sizeof(GameOverPacket)) return;
+  GameOverPacket *rcvdPacket = reinterpret_cast<GameOverPacket *>(packet->data);
+  GameOverPacket ackPacket = {
+      .packetType = XboardPacketType::PACKET_GAME_OVER_ACK,
+      .score = game.game_get_score(),
+      .nonce = savedNonce = rcvdPacket->nonce};
+  g_game_controller.GetUsername(ackPacket.username);
+  g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&ackPacket),
+                                sizeof(ackPacket), TETRIS_RECV_ID);
+}
+
+void TetrisApp::UploadSingleplayerScore() {
+  hitcon::game::SingleBadgeActivity activity = {
+      .eventType = hitcon::game::EventType::kTetris};
+  uint16_t score = game.game_get_score();
+  memcpy(activity.eventData, &score, sizeof(score));
+  // Ignore the return value here. If it fails to send the result is dropped.
+  g_game_controller.SendSingleBadgeActivity(activity);
+}
+
+void TetrisApp::UploadMultiplayerScore(
+    hitcon::service::xboard::PacketCallbackArg *packet) {
+  if (packet->len != sizeof(GameOverPacket)) return;
+
+  GameOverPacket *gameOverPacket =
+      reinterpret_cast<GameOverPacket *>(packet->data);
+
+  if (savedNonce != gameOverPacket->nonce) return;
+  if (gameOverPacket->packetType != XboardPacketType::PACKET_GAME_OVER &&
+      gameOverPacket->packetType != XboardPacketType::PACKET_GAME_OVER_ACK)
+    return;
+  if (game.game_get_state() != hitcon::tetris::GAME_STATE_GAME_OVER) return;
+
+  hitcon::game::TwoBadgeActivity activity = {
+      .gameType = hitcon::game::EventType::kTetris,
+      .myScore = game.game_get_score(),
+      .otherScore = gameOverPacket->score,
+      .nonce = gameOverPacket->nonce};
+
+  memcpy(activity.otherUser, gameOverPacket->username,
+         sizeof(activity.otherUser));
+  // Ignoring the return value here. If we fail to send the score then it's
+  // dropped.
+  g_game_controller.SendTwoBadgeActivity(activity);
 }
 
 void TetrisApp::OnButton(button_t button) {
@@ -177,10 +253,10 @@ void TetrisApp::periodic_task_callback(void *) {
     }
 
     case hitcon::tetris::GAME_STATE_GAME_OVER: {
-      if (multiplayer) {
-        uint8_t code = PACKET_GAME_OVER;
-        g_xboard_logic.QueueDataForTx(&code, 1, TETRIS_RECV_ID);
-      }
+      if (multiplayer)
+        SendGameOver();
+      else
+        UploadSingleplayerScore();
 
       show_score_app.SetScore(game.game_get_score());
       g_game_score.MarkScore(GameScoreType::GAME_TETRIS, game.game_get_score());
