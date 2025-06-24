@@ -19,3 +19,4 @@ pcb/kicad/pcb_badge/fp-info-cache
 .aider*
 *.egg-info
 /pcb/kicad/pcb_badge/Temp
+.vscode
