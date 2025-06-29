@@ -154,6 +154,11 @@ void ShowNameApp::SetMode(const enum ShowNameMode mode) {
   update_display();
 }
 
+void ShowNameApp::SetScore(uint32_t score) {
+  score_cache = score;
+  update_display();
+}
+
 void ShowNameApp::SetSurpriseMsg(const char *msg) {
   int len = strlen(msg);
   if (len >= kDisplayScrollMaxTextLen) {

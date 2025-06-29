@@ -67,6 +67,9 @@ void IrController::OnPacketReceived(void* arg) {
     scheduler.Queue(&showtext_task, &data->opaq.show);
   } else if (data->type == packet_type::kAcknowledge) {
     OnAcknowledgePacket(&data->opaq.acknowledge);
+  } else if (data->type == packet_type::kScoreAnnonce) {
+    show_name_app.SetScore(
+        *reinterpret_cast<uint32_t*>(data->opaq.score_announce.score));
   }
 }
 

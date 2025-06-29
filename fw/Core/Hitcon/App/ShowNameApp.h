@@ -34,6 +34,7 @@ class ShowNameApp : public App {
 
   void SetName(const char *name);
   void SetMode(const enum ShowNameMode mode);
+  void SetScore(uint32_t score);
   enum ShowNameMode GetMode();
 
   void SetSurpriseMsg(const char *msg);
