@@ -16,6 +16,9 @@
 using hitcon::service::sched::SysTimer;
 using hitcon::service::sched::task_callback_t;
 using namespace hitcon::service::xboard;
+using hitcon::service::xboard::RecvFnId;
+using hitcon::game::EventType;
+using hitcon::app::multiplayer::PlayerCount;
 
 namespace hitcon {
 
@@ -43,29 +46,49 @@ static void SendAttackEnemyPacket(int n_lines) {
   g_xboard_logic.QueueDataForTx(&data[0], 2, TETRIS_RECV_ID);
 }
 
-void TetrisApp::OnEntry() {
+void TetrisApp::GameEntry() {
   // start a new game
   game = hitcon::tetris::TetrisGame(tetris_random);
   display_set_mode_scroll_text("Ready?");
-  if (multiplayer) {
+  if (IsMultiplayer()) {
     game.game_register_attack_enemy_callback(SendAttackEnemyPacket);
   }
 
   // start the update task
   hitcon::service::sched::scheduler.EnablePeriodic(&periodic_task);
-  g_xboard_logic.SetOnPacketArrive((callback_t)&TetrisApp::OnXboardRecv, this,
-                                   TETRIS_RECV_ID);
 }
 
-void SetSingleplayer() { tetris_app.SetPlayerCount(SINGLEPLAYER); }
-
-void SetMultiplayer() { tetris_app.SetPlayerCount(MULTIPLAYER); }
-
-void TetrisApp::SetPlayerCount(unsigned playerCount) {
-  multiplayer = (playerCount == MULTIPLAYER);
+void TetrisApp::StartGame() {
+  game.game_start_playing();
 }
 
-void TetrisApp::OnExit() {
+void TetrisApp::AbortGame() {
+  badge_controller.BackToMenu(this);
+}
+
+void TetrisApp::GameOver() {
+  show_score_app.SetScore(GetScore());
+  g_game_score.MarkScore(GameScoreType::GAME_TETRIS, GetScore());
+  badge_controller.change_app(&show_score_app);
+}
+
+RecvFnId TetrisApp::GetXboardRecvId() const {
+  return RecvFnId::TETRIS_RECV_ID;
+}
+
+EventType TetrisApp::GetGameType() const {
+  return EventType::kTetris;
+}
+
+uint32_t TetrisApp::GetScore() const {
+  return game.game_get_score();
+}
+
+void SetSingleplayer() { tetris_app.SetPlayerCount(PlayerCount::SINGLEPLAYER); }
+
+void SetMultiplayer() { tetris_app.SetPlayerCount(PlayerCount::MULTIPLAYER); }
+
+void TetrisApp::GameExit() {
   hitcon::service::sched::scheduler.DisablePeriodic(&periodic_task);
 }
 
@@ -75,123 +98,20 @@ void TetrisApp::RecvAttackPacket(PacketCallbackArg *packet) {
   game.game_enemy_attack(n_lines);
 }
 
-void TetrisApp::OnXboardRecv(void *arg) {
-  PacketCallbackArg *packet = reinterpret_cast<PacketCallbackArg *>(arg);
-  switch (packet->data[0]) {
-    case PACKET_GAME_START:
-      game.game_start_playing();
-      break;
-
-    case PACKET_ATTACK:
-      RecvAttackPacket(packet);
-      break;
-
-    case PACKET_GAME_OVER:
-      game.game_force_over();
-      if (multiplayer) {
-        SendGameOverAck(packet);
-        UploadMultiplayerScore(packet);
-      }
-      show_score_app.SetScore(game.game_get_score());
-      g_game_score.MarkScore(GameScoreType::GAME_TETRIS, game.game_get_score());
-      badge_controller.change_app(&show_score_app);
-      break;
-    case PACKET_GAME_OVER_ACK:
-      if (multiplayer) UploadMultiplayerScore(packet);
-      break;
-
-    case PACKET_ABORT_GAME:
-      badge_controller.BackToMenu(this);
-      break;
-  }
-}
-
-struct __attribute__((packed)) GameOverPacket {
-  XboardPacketType packetType;
-  uint16_t score;
-  uint8_t username[hitcon::ir::IR_USERNAME_LEN];
-  uint16_t nonce;
-};
-
-static_assert(sizeof(GameOverPacket) ==
-              sizeof(XboardPacketType) + sizeof(uint16_t) +
-                  hitcon::ir::IR_USERNAME_LEN + sizeof(uint16_t));
-
-void TetrisApp::SendGameOver() {
-  GameOverPacket packet = {
-      .packetType = XboardPacketType::PACKET_GAME_OVER,
-      .score = game.game_get_score(),
-      .nonce = savedNonce = g_fast_random_pool.GetRandom()};
-  g_game_controller.GetUsername(packet.username);
-  g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&packet),
-                                sizeof(packet), TETRIS_RECV_ID);
-}
-
-void TetrisApp::SendGameOverAck(PacketCallbackArg *packet) {
-  if (packet->len != sizeof(GameOverPacket)) return;
-  GameOverPacket *rcvdPacket = reinterpret_cast<GameOverPacket *>(packet->data);
-  GameOverPacket ackPacket = {
-      .packetType = XboardPacketType::PACKET_GAME_OVER_ACK,
-      .score = game.game_get_score(),
-      .nonce = savedNonce = rcvdPacket->nonce};
-  g_game_controller.GetUsername(ackPacket.username);
-  g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&ackPacket),
-                                sizeof(ackPacket), TETRIS_RECV_ID);
-}
-
-void TetrisApp::UploadSingleplayerScore() {
-  hitcon::game::SingleBadgeActivity activity = {
-      .eventType = hitcon::game::EventType::kTetris};
-  uint16_t score = game.game_get_score();
-  memcpy(activity.eventData, &score, sizeof(score));
-  // Ignore the return value here. If it fails to send the result is dropped.
-  g_game_controller.SendSingleBadgeActivity(activity);
-}
-
-void TetrisApp::UploadMultiplayerScore(
-    hitcon::service::xboard::PacketCallbackArg *packet) {
-  if (packet->len != sizeof(GameOverPacket)) return;
-
-  GameOverPacket *gameOverPacket =
-      reinterpret_cast<GameOverPacket *>(packet->data);
-
-  if (savedNonce != gameOverPacket->nonce) return;
-  if (gameOverPacket->packetType != XboardPacketType::PACKET_GAME_OVER &&
-      gameOverPacket->packetType != XboardPacketType::PACKET_GAME_OVER_ACK)
-    return;
-  if (game.game_get_state() != hitcon::tetris::GAME_STATE_GAME_OVER) return;
-
-  hitcon::game::TwoBadgeActivity activity = {
-      .gameType = hitcon::game::EventType::kTetris,
-      .myScore = game.game_get_score(),
-      .otherScore = gameOverPacket->score,
-      .nonce = gameOverPacket->nonce};
-
-  memcpy(activity.otherUser, gameOverPacket->username,
-         sizeof(activity.otherUser));
-  // Ignoring the return value here. If we fail to send the score then it's
-  // dropped.
-  g_game_controller.SendTwoBadgeActivity(activity);
-}
-
 void TetrisApp::OnButton(button_t button) {
   switch (game.game_get_state()) {
     case hitcon::tetris::GAME_STATE_WAITING: {
       switch (button) {
         case BUTTON_OK:
-          if (multiplayer) {
-            uint8_t code = PACKET_GAME_START;
-            g_xboard_logic.QueueDataForTx(&code, 1, TETRIS_RECV_ID);
-          }
-          game.game_start_playing();
+          if (IsMultiplayer())
+            SendStartGame();
+          StartGame();
           break;
         case BUTTON_BACK:
         case BUTTON_LONG_BACK:
-          if (multiplayer) {
-            uint8_t code = PACKET_ABORT_GAME;
-            g_xboard_logic.QueueDataForTx(&code, 1, TETRIS_RECV_ID);
-          }
-          badge_controller.BackToMenu(this);
+          if (IsMultiplayer())
+            SendAbortGame();
+          AbortGame();
           break;
         default:
           break;
@@ -232,11 +152,9 @@ void TetrisApp::OnButton(button_t button) {
 
         case BUTTON_BACK:
         case BUTTON_LONG_BACK:
-          if (multiplayer) {
-            uint8_t code = PACKET_ABORT_GAME;
-            g_xboard_logic.QueueDataForTx(&code, 1, TETRIS_RECV_ID);
-          }
-          badge_controller.BackToMenu(this);
+          if (IsMultiplayer())
+            SendAbortGame();
+          AbortGame();
           break;
 
         default:
@@ -253,14 +171,11 @@ void TetrisApp::periodic_task_callback(void *) {
     }
 
     case hitcon::tetris::GAME_STATE_GAME_OVER: {
-      if (multiplayer)
+      if (IsMultiplayer())
         SendGameOver();
       else
         UploadSingleplayerScore();
-
-      show_score_app.SetScore(game.game_get_score());
-      g_game_score.MarkScore(GameScoreType::GAME_TETRIS, game.game_get_score());
-      badge_controller.change_app(&show_score_app);
+      GameOver();
       break;
     }
 

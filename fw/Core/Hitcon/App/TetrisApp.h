@@ -4,6 +4,7 @@
 #include <Logic/ButtonLogic.h>
 #include <Logic/XBoardLogic.h>
 #include <Service/Sched/Scheduler.h>
+#include <App/MultiplayerGame.h>
 
 #include "TetrisGame.h"
 #include "app.h"
@@ -42,32 +43,26 @@ void SetMultiplayer();
  * This app will create a periodic task to update the game state.
  * When ever a button is pressed, it is handled immediately.
  */
-class TetrisApp : public App {
+class TetrisApp : public hitcon::app::multiplayer::MultiplayerGame {
  private:
-  bool multiplayer = false;
-
   hitcon::tetris::TetrisGame game;
   hitcon::service::sched::PeriodicTask periodic_task;
-
-  void RecvAttackPacket(hitcon::service::xboard::PacketCallbackArg *packet);
-
-  uint16_t savedNonce;
-
-  void SendGameOver();
-  void SendGameOverAck(hitcon::service::xboard::PacketCallbackArg *packet);
-  void UploadSingleplayerScore();
-  void UploadMultiplayerScore(
-      hitcon::service::xboard::PacketCallbackArg *packet);
-
+ protected:
+  virtual void GameEntry() override final;
+  virtual void GameExit() override final;
+  virtual void StartGame() override final;
+  virtual void AbortGame() override final;
+  virtual void GameOver() override final;
+  virtual hitcon::service::xboard::RecvFnId GetXboardRecvId() const override final;
+  virtual hitcon::game::EventType GetGameType() const override final;
+  virtual void RecvAttackPacket(
+      hitcon::service::xboard::PacketCallbackArg *packet) override final;
+  virtual uint32_t GetScore() const override final;
  public:
   TetrisApp();
   virtual ~TetrisApp() = default;
 
-  void OnEntry() override;
-  void OnExit() override;
-  void OnButton(button_t button) override;
-  void OnXboardRecv(void *arg);
-  void SetPlayerCount(unsigned playerCount);
+  void OnButton(button_t button) override final;
 
   void periodic_task_callback(void *);
 };
