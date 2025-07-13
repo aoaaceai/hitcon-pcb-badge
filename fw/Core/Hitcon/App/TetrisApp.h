@@ -15,19 +15,6 @@ namespace app {
 
 namespace tetris {
 
-enum XboardPacketType : uint8_t {  // XBOARD
-  PACKET_ATTACK = 1,
-  PACKET_GAME_START,
-  PACKET_GAME_OVER,
-  PACKET_GAME_OVER_ACK,
-  PACKET_ABORT_GAME,
-};
-
-enum {  // player count
-  SINGLEPLAYER = 1,
-  MULTIPLAYER,
-};
-
 // set mode before changing to tetris app
 void SetSingleplayer();
 void SetMultiplayer();

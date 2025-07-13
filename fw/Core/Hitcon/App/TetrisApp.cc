@@ -19,6 +19,7 @@ using namespace hitcon::service::xboard;
 using hitcon::service::xboard::RecvFnId;
 using hitcon::game::EventType;
 using hitcon::app::multiplayer::PlayerCount;
+using hitcon::app::multiplayer::XboardPacketType;
 
 namespace hitcon {
 
@@ -42,7 +43,7 @@ TetrisApp::TetrisApp()
 }
 
 static void SendAttackEnemyPacket(int n_lines) {
-  uint8_t data[2] = {PACKET_ATTACK, (uint8_t)n_lines};
+  uint8_t data[2] = {XboardPacketType::PACKET_ATTACK, (uint8_t)n_lines};
   g_xboard_logic.QueueDataForTx(&data[0], 2, TETRIS_RECV_ID);
 }
 
