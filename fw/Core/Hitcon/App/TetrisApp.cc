@@ -16,10 +16,10 @@
 using hitcon::service::sched::SysTimer;
 using hitcon::service::sched::task_callback_t;
 using namespace hitcon::service::xboard;
-using hitcon::service::xboard::RecvFnId;
-using hitcon::game::EventType;
 using hitcon::app::multiplayer::PlayerCount;
 using hitcon::app::multiplayer::XboardPacketType;
+using hitcon::game::EventType;
+using hitcon::service::xboard::RecvFnId;
 
 namespace hitcon {
 
@@ -59,13 +59,9 @@ void TetrisApp::GameEntry() {
   hitcon::service::sched::scheduler.EnablePeriodic(&periodic_task);
 }
 
-void TetrisApp::StartGame() {
-  game.game_start_playing();
-}
+void TetrisApp::StartGame() { game.game_start_playing(); }
 
-void TetrisApp::AbortGame() {
-  badge_controller.BackToMenu(this);
-}
+void TetrisApp::AbortGame() { badge_controller.BackToMenu(this); }
 
 void TetrisApp::GameOver() {
   show_score_app.SetScore(GetScore());
@@ -73,17 +69,11 @@ void TetrisApp::GameOver() {
   badge_controller.change_app(&show_score_app);
 }
 
-RecvFnId TetrisApp::GetXboardRecvId() const {
-  return RecvFnId::TETRIS_RECV_ID;
-}
+RecvFnId TetrisApp::GetXboardRecvId() const { return RecvFnId::TETRIS_RECV_ID; }
 
-EventType TetrisApp::GetGameType() const {
-  return EventType::kTetris;
-}
+EventType TetrisApp::GetGameType() const { return EventType::kTetris; }
 
-uint32_t TetrisApp::GetScore() const {
-  return game.game_get_score();
-}
+uint32_t TetrisApp::GetScore() const { return game.game_get_score(); }
 
 void SetSingleplayer() { tetris_app.SetPlayerCount(PlayerCount::SINGLEPLAYER); }
 
@@ -104,14 +94,12 @@ void TetrisApp::OnButton(button_t button) {
     case hitcon::tetris::GAME_STATE_WAITING: {
       switch (button) {
         case BUTTON_OK:
-          if (IsMultiplayer())
-            SendStartGame();
+          if (IsMultiplayer()) SendStartGame();
           StartGame();
           break;
         case BUTTON_BACK:
         case BUTTON_LONG_BACK:
-          if (IsMultiplayer())
-            SendAbortGame();
+          if (IsMultiplayer()) SendAbortGame();
           AbortGame();
           break;
         default:
@@ -153,8 +141,7 @@ void TetrisApp::OnButton(button_t button) {
 
         case BUTTON_BACK:
         case BUTTON_LONG_BACK:
-          if (IsMultiplayer())
-            SendAbortGame();
+          if (IsMultiplayer()) SendAbortGame();
           AbortGame();
           break;
 

@@ -53,9 +53,7 @@ void SnakeApp::StartGame() {
   InitGame();
 }
 
-void SnakeApp::AbortGame() {
-  badge_controller.BackToMenu(this);
-}
+void SnakeApp::AbortGame() { badge_controller.BackToMenu(this); }
 
 void SnakeApp::GameOver() {
   _game_over = true;
@@ -65,21 +63,13 @@ void SnakeApp::GameOver() {
   badge_controller.change_app(&show_score_app);
 }
 
-void SnakeApp::RecvAttackPacket(PacketCallbackArg* packet) {
-  _len++;
-}
+void SnakeApp::RecvAttackPacket(PacketCallbackArg* packet) { _len++; }
 
-RecvFnId SnakeApp::GetXboardRecvId() const {
-  return SNAKE_RECV_ID;
-}
+RecvFnId SnakeApp::GetXboardRecvId() const { return SNAKE_RECV_ID; }
 
-EventType SnakeApp::GetGameType() const {
-  return EventType::kSnake;
-}
+EventType SnakeApp::GetGameType() const { return EventType::kSnake; }
 
-uint32_t SnakeApp::GetScore() const {
-  return _score;
-}
+uint32_t SnakeApp::GetScore() const { return _score; }
 
 void SnakeApp::OnEdgeButton(button_t button) {
   direction_t btn_direction = NONE;

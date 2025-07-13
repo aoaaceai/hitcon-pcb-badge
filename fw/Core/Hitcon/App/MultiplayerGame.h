@@ -1,11 +1,11 @@
 #ifndef MULTIPLAYER_GAME_H
 #define MULTIPLAYER_GAME_H
 
-#include "app.h"
-#include <Logic/XBoardLogic.h>
+#include <Logic/GameController.h>
 #include <Logic/IrController.h>
 #include <Logic/XBoardLogic.h>
-#include <Logic/GameController.h>
+
+#include "app.h"
 
 namespace hitcon {
 
@@ -21,10 +21,7 @@ enum XboardPacketType : uint8_t {
   PACKET_ATTACK
 };
 
-enum PlayerCount {
-  SINGLEPLAYER = 1,
-  MULTIPLAYER
-};
+enum PlayerCount { SINGLEPLAYER = 1, MULTIPLAYER };
 
 struct GameOverPacket {
   XboardPacketType packetType;
@@ -43,9 +40,11 @@ class MultiplayerGame : public App {
   PlayerCount playerCount;
   void OnXboardRecv(void *arg);
   void SendGameOverAck(hitcon::service::xboard::PacketCallbackArg *rcvdPacket);
+
  protected:
   void UploadSingleplayerScore();
-  void UploadMultiplayerScore(hitcon::service::xboard::PacketCallbackArg *packet);
+  void UploadMultiplayerScore(
+      hitcon::service::xboard::PacketCallbackArg *packet);
   void SendGameOver();
   void SendStartGame();
   void SendAbortGame();
@@ -59,17 +58,19 @@ class MultiplayerGame : public App {
   virtual hitcon::service::xboard::RecvFnId GetXboardRecvId() const = 0;
   virtual hitcon::game::EventType GetGameType() const = 0;
   virtual uint32_t GetScore() const = 0;
-  virtual void RecvAttackPacket(hitcon::service::xboard::PacketCallbackArg *packet) = 0;
+  virtual void RecvAttackPacket(
+      hitcon::service::xboard::PacketCallbackArg *packet) = 0;
+
  public:
   void SetPlayerCount(PlayerCount playerCount);
   void OnEntry() override final;
   void OnExit() override final;
 };
 
-} // namespace multiplayer
+}  // namespace multiplayer
 
-} // namespace app
+}  // namespace app
 
-} // namespace hitcon
+}  // namespace hitcon
 
-#endif // MULTIPLAYER_GAME_H
+#endif  // MULTIPLAYER_GAME_H

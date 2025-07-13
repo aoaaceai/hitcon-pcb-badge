@@ -1,10 +1,10 @@
 #ifndef TETRIS_APP_H
 #define TETRIS_APP_H
 
+#include <App/MultiplayerGame.h>
 #include <Logic/ButtonLogic.h>
 #include <Logic/XBoardLogic.h>
 #include <Service/Sched/Scheduler.h>
-#include <App/MultiplayerGame.h>
 
 #include "TetrisGame.h"
 #include "app.h"
@@ -34,17 +34,20 @@ class TetrisApp : public hitcon::app::multiplayer::MultiplayerGame {
  private:
   hitcon::tetris::TetrisGame game;
   hitcon::service::sched::PeriodicTask periodic_task;
+
  protected:
   virtual void GameEntry() override final;
   virtual void GameExit() override final;
   virtual void StartGame() override final;
   virtual void AbortGame() override final;
   virtual void GameOver() override final;
-  virtual hitcon::service::xboard::RecvFnId GetXboardRecvId() const override final;
+  virtual hitcon::service::xboard::RecvFnId GetXboardRecvId()
+      const override final;
   virtual hitcon::game::EventType GetGameType() const override final;
   virtual void RecvAttackPacket(
       hitcon::service::xboard::PacketCallbackArg *packet) override final;
   virtual uint32_t GetScore() const override final;
+
  public:
   TetrisApp();
   virtual ~TetrisApp() = default;

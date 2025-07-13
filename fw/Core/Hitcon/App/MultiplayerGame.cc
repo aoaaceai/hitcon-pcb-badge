@@ -3,13 +3,14 @@
 #include <Logic/IrController.h>
 #include <Logic/RandomPool.h>
 #include <Logic/XBoardLogic.h>
+
 #include <cstring>
 
+using hitcon::game::EventType;
+using hitcon::game::SingleBadgeActivity;
+using hitcon::game::TwoBadgeActivity;
 using hitcon::service::xboard::g_xboard_logic;
 using hitcon::service::xboard::PacketCallbackArg;
-using hitcon::game::TwoBadgeActivity;
-using hitcon::game::SingleBadgeActivity;
-using hitcon::game::EventType;
 
 namespace hitcon {
 
@@ -42,26 +43,23 @@ void MultiplayerGame::OnXboardRecv(void *arg) {
 
 void MultiplayerGame::UploadMultiplayerScore(PacketCallbackArg *packet) {
   if (packet->len != sizeof(GameOverPacket)) return;
-  GameOverPacket *gameOverPacket = reinterpret_cast<GameOverPacket *>(packet->data);
+  GameOverPacket *gameOverPacket =
+      reinterpret_cast<GameOverPacket *>(packet->data);
   if (gameOverPacket->packetType != PACKET_GAME_OVER &&
-    gameOverPacket->packetType != PACKET_GAME_OVER_ACK)
+      gameOverPacket->packetType != PACKET_GAME_OVER_ACK)
     return;
   if (gameOverPacket->nonce != savedNonce) return;
-  TwoBadgeActivity activity = {
-    .gameType = GetGameType(),
-    .myScore = GetScore(),
-    .otherScore = gameOverPacket->score,
-    .nonce = gameOverPacket->nonce
-  };
-  memcpy(activity.otherUser, gameOverPacket->username, sizeof(activity.otherUser));
+  TwoBadgeActivity activity = {.gameType = GetGameType(),
+                               .myScore = GetScore(),
+                               .otherScore = gameOverPacket->score,
+                               .nonce = gameOverPacket->nonce};
+  memcpy(activity.otherUser, gameOverPacket->username,
+         sizeof(activity.otherUser));
   g_game_controller.SendTwoBadgeActivity(activity);
 }
 
 void MultiplayerGame::UploadSingleplayerScore() {
-  SingleBadgeActivity activity = {
-    .eventType = GetGameType(),
-    .eventData = {0}
-  };
+  SingleBadgeActivity activity = {.eventType = GetGameType(), .eventData = {0}};
   uint32_t score = GetScore();
   memcpy(activity.eventData, &score, sizeof(activity.eventData));
   g_game_controller.SendSingleBadgeActivity(activity);
@@ -69,10 +67,9 @@ void MultiplayerGame::UploadSingleplayerScore() {
 
 void MultiplayerGame::SendGameOver() {
   GameOverPacket packet = {
-    .packetType = XboardPacketType::PACKET_GAME_OVER,
-    .nonce = savedNonce = (uint16_t)g_fast_random_pool.GetRandom(),
-    .score = GetScore()
-  };
+      .packetType = XboardPacketType::PACKET_GAME_OVER,
+      .nonce = savedNonce = (uint16_t)g_fast_random_pool.GetRandom(),
+      .score = GetScore()};
   g_game_controller.GetUsername(packet.username);
   g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&packet),
                                 sizeof(packet), GetXboardRecvId());
@@ -80,13 +77,12 @@ void MultiplayerGame::SendGameOver() {
 
 void MultiplayerGame::SendGameOverAck(PacketCallbackArg *rcvdPacket) {
   if (rcvdPacket->len != sizeof(GameOverPacket)) return;
-  GameOverPacket *_rcvdPacket = reinterpret_cast<GameOverPacket *>(rcvdPacket->data);
+  GameOverPacket *_rcvdPacket =
+      reinterpret_cast<GameOverPacket *>(rcvdPacket->data);
   if (_rcvdPacket->packetType != PACKET_GAME_OVER) return;
-  GameOverPacket packet = {
-    .packetType = XboardPacketType::PACKET_GAME_OVER_ACK,
-    .nonce = savedNonce = _rcvdPacket->nonce,
-    .score = GetScore()
-  };
+  GameOverPacket packet = {.packetType = XboardPacketType::PACKET_GAME_OVER_ACK,
+                           .nonce = savedNonce = _rcvdPacket->nonce,
+                           .score = GetScore()};
   g_game_controller.GetUsername(packet.username);
   g_xboard_logic.QueueDataForTx(reinterpret_cast<uint8_t *>(&packet),
                                 sizeof(packet), GetXboardRecvId());
@@ -94,12 +90,14 @@ void MultiplayerGame::SendGameOverAck(PacketCallbackArg *rcvdPacket) {
 
 void MultiplayerGame::SendStartGame() {
   XboardPacketType packetType = PACKET_START;
-  g_xboard_logic.QueueDataForTx((uint8_t *)&packetType, sizeof(packetType), GetXboardRecvId());
+  g_xboard_logic.QueueDataForTx((uint8_t *)&packetType, sizeof(packetType),
+                                GetXboardRecvId());
 }
 
 void MultiplayerGame::SendAbortGame() {
   XboardPacketType packetType = PACKET_ABORT;
-  g_xboard_logic.QueueDataForTx((uint8_t *)&packetType, sizeof(packetType), GetXboardRecvId());
+  g_xboard_logic.QueueDataForTx((uint8_t *)&packetType, sizeof(packetType),
+                                GetXboardRecvId());
 }
 
 void MultiplayerGame::SendAttack(uint8_t atk) {
@@ -109,13 +107,11 @@ void MultiplayerGame::SendAttack(uint8_t atk) {
 
 void MultiplayerGame::OnEntry() {
   GameEntry();
-  g_xboard_logic.SetOnPacketArrive(
-      (callback_t)&MultiplayerGame::OnXboardRecv, this, GetXboardRecvId());
+  g_xboard_logic.SetOnPacketArrive((callback_t)&MultiplayerGame::OnXboardRecv,
+                                   this, GetXboardRecvId());
 }
 
-void MultiplayerGame::OnExit() {
-  GameExit();
-}
+void MultiplayerGame::OnExit() { GameExit(); }
 
 void MultiplayerGame::SetPlayerCount(PlayerCount playerCount) {
   this->playerCount = playerCount;
@@ -125,8 +121,8 @@ bool MultiplayerGame::IsMultiplayer() const {
   return playerCount == PlayerCount::MULTIPLAYER;
 }
 
-} // namespace multiplayer
+}  // namespace multiplayer
 
-} // namespace app
+}  // namespace app
 
-} // namespace hitcon
+}  // namespace hitcon

@@ -1,9 +1,9 @@
 #ifndef SNAKE_APP_H
 #define SNAKE_APP_H
 
+#include <App/MultiplayerGame.h>
 #include <Logic/Display/display.h>
 #include <Service/Sched/PeriodicTask.h>
-#include <App/MultiplayerGame.h>
 
 #include "app.h"
 
@@ -58,16 +58,20 @@ class SnakeApp : public hitcon::app::multiplayer::MultiplayerGame {
   void GenerateFood();
   void Routine(void* unused);
   bool OnSnake(uint8_t index);
+
  protected:
   virtual void GameEntry() override final;
   virtual void GameExit() override final;
   virtual void StartGame() override final;
   virtual void AbortGame() override final;
   virtual void GameOver() override final;
-  virtual hitcon::service::xboard::RecvFnId GetXboardRecvId() const override final;
+  virtual hitcon::service::xboard::RecvFnId GetXboardRecvId()
+      const override final;
   virtual hitcon::game::EventType GetGameType() const override final;
   virtual uint32_t GetScore() const override final;
-  virtual void RecvAttackPacket(hitcon::service::xboard::PacketCallbackArg* packet) override final;
+  virtual void RecvAttackPacket(
+      hitcon::service::xboard::PacketCallbackArg* packet) override final;
+
  public:
   unsigned mode;
   SnakeApp();
