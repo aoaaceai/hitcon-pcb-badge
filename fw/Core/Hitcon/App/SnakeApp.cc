@@ -91,10 +91,10 @@ void SnakeApp::OnEdgeButton(button_t button) {
     case BUTTON_OK:
       if (_game_over) badge_controller.change_app(this);
       if (_state == STATE_WAIT) {
-        _state = STATE_PLAYING;
         if (IsMultiplayer()) {
           SendStartGame();
         }
+        StartGame();
       }
       break;
     case BUTTON_BACK:
