@@ -9,6 +9,7 @@
 
 #include <cstring>
 
+using hitcon::ir::IR_USERNAME_LEN;
 namespace hitcon {
 
 hitcon::game::GameController g_game_controller;
@@ -28,7 +29,7 @@ void GameController::Init() {
 bool GameController::SendTwoBadgeActivity(const TwoBadgeActivity &data) {
   hitcon::ir::TwoBadgeActivityPacket packet;
   GetUsername(packet.user1);
-  memcpy(packet.user2, data.otherUser, hitcon::ir::IR_USERNAME_LEN);
+  memcpy(packet.user2, data.otherUser, IR_USERNAME_LEN);
   // Game Type: byte 0 bits 0:4
   packet.game_data[0] = data.gameType & 0xf;
   // Player 1 Score: byte 0 bits 4:8, byte 1 bits 0:6
@@ -83,11 +84,11 @@ void GameController::OnPrivKeyHashFinish(void *arg2) {
 }
 
 void GameController::GetUsername(uint8_t *buf) {
-  // TODO: We use the first few bytes of pubkey as username for now.
-  // If needed, hash the public key to get a more unique identifier.
+  // To guarantee maximum entropy, we use the last 4 bytes of the x-coordinate
+  // of the public key, which is byte 3 - 6 inclusive.
   uint8_t pubkey[ECC_PUBKEY_SIZE];
   hitcon::ecc::g_ec_logic.GetPublicKey(pubkey);
-  memcpy(buf, pubkey, hitcon::ir::IR_USERNAME_LEN);
+  memcpy(buf, pubkey + ECC_PUBKEY_SIZE - IR_USERNAME_LEN - 1, IR_USERNAME_LEN);
 }
 
 bool GameController::TrySendPubAnnounce() {
