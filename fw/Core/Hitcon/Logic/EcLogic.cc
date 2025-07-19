@@ -27,6 +27,8 @@ static const EcPoint g_generator({0x9a77dc33b36acc, 0xbcffb098340493},
                                  {0x279be90a95dbdd, 0xbcffb098340493});
 static const uint64_t g_curveOrder = 0xbcffb09c43733d;
 // TODO: use GetPerBoardSecret to set the private key
+static const EcPoint g_serverPubKey({0x05cb6b63de507e, 0xbcffb098340493},
+                                    {0x4df751a1388b25, 0xbcffb098340493});
 
 constexpr inline uint64_t modneg(const uint64_t x, const uint64_t m) {
   return m - (x % m);
@@ -337,14 +339,23 @@ void Signature::toBuffer(uint8_t *buffer) const {
   memcpy(buffer + ECC_SIGNATURE_SIZE / 2, &s, ECC_SIGNATURE_SIZE / 2);
 }
 
-EcContext::EcContext() : r(0, g_curveOrder), s(0, g_curveOrder) {}
+void Signature::fromBuffer(const uint8_t *buffer) {
+  r = 0;
+  s = 0;
+  memcpy(&r, buffer, ECC_SIGNATURE_SIZE / 2);
+  memcpy(&s, buffer + ECC_SIGNATURE_SIZE / 2, ECC_SIGNATURE_SIZE / 2);
+}
+
+EcContext::EcContext()
+    : r(0, g_curveOrder), s(0, g_curveOrder), u1(0, g_curveOrder),
+      u2(0, g_curveOrder) {}
 
 bool EcLogic::StartSign(uint8_t const *message, uint32_t len,
                         callback_t callback, void *callbackArg1) {
   if (busy) return false;
   if (!publicKeyReady) return false;
   if (!g_hash_service.StartHash(message, len,
-                                (callback_t)&EcLogic::onHashFinish, this))
+                                (callback_t)&EcLogic::onSignHashFinish, this))
     return false;
   busy = true;
   this->callback = callback;
@@ -352,17 +363,41 @@ bool EcLogic::StartSign(uint8_t const *message, uint32_t len,
   return true;
 }
 
-void EcLogic::onHashFinish(HashResult *hashResult) {
+bool EcLogic::StartVerify(uint8_t const *message, uint32_t len,
+                          uint8_t *signature, callback_t callback,
+                          void *callbackArg1) {
+  if (busy) return false;
+  if (!g_hash_service.StartHash(message, len,
+                                (callback_t)&EcLogic::onVerifyHashFinish, this))
+    return false;
+  busy = true;
+  // Init the context
+  tmpSignature.fromBuffer(signature);
+  context.r = tmpSignature.r;
+  context.s = tmpSignature.s;
+  this->callback = callback;
+  this->callback_arg1 = callbackArg1;
+  return true;
+}
+
+void EcLogic::onSignHashFinish(HashResult *hashResult) {
   context.z = reinterpret_cast<uint64_t *>(hashResult->digest)[0];
   scheduler.Queue(&genRandTask, this);
 }
 
+void EcLogic::onVerifyHashFinish(HashResult *HashResult) {
+  context.z = reinterpret_cast<uint64_t *>(HashResult->digest)[0];
+  // u1 = z / s
+  g_mod_div_service.start(context.z, context.s.val, g_curveOrder,
+                          (callback_t)&EcLogic::onU1Generated, this);
+}
+
 void EcLogic::genRand() {
-  if (g_secure_random_pool.GetRandom(&context.k))
-    g_point_mult_service.start(g_generator, context.k,
-                               (callback_t)&EcLogic::onRGenerated, this);
-  else
-    scheduler.Queue(&genRandTask, this);
+  context.k =
+      g_fast_random_pool.GetRandom() << 32 | g_fast_random_pool.GetRandom();
+  // r = k * G
+  g_point_mult_service.start(g_generator, context.k,
+                             (callback_t)&EcLogic::onRGenerated, this);
 }
 
 void EcLogic::onRGenerated(EcPoint *p) {
@@ -371,6 +406,7 @@ void EcLogic::onRGenerated(EcPoint *p) {
     scheduler.Queue(&genRandTask, this);
   else {
     ModNum a = (context.z + privateKey * context.r);
+    // s = (z + r * d) / k
     g_mod_div_service.start(a.val, context.k, a.mod,
                             (callback_t)&EcLogic::onSGenerated, this);
   }
@@ -384,10 +420,49 @@ void EcLogic::onSGenerated(ModNum *s) {
     scheduler.Queue(&finalizeTask, this);
 }
 
-void EcLogic::finalize() {
+void EcLogic::finalizeSign() {
   tmpSignature.r = context.r.val;
   tmpSignature.s = context.s.val;
   callback(callback_arg1, &tmpSignature);
+  busy = false;
+}
+
+void EcLogic::onU1Generated(ModNum *u1) {
+  context.u1 = *u1;
+  // u2 = r / s
+  g_mod_div_service.start(context.r.val, context.s.val, g_curveOrder,
+                          (callback_t)&EcLogic::onU2Generated, this);
+}
+
+void EcLogic::onU2Generated(ModNum *u2) {
+  context.u2 = *u2;
+  // normally, the next step is P = u1 * G + u2 * pub
+  // but we do it separately:
+  // m = u1 * G
+  // n = u2 * pub
+  // P = m + n
+  g_point_mult_service.start(g_generator, context.u1.val,
+                             (callback_t)&EcLogic::onMGenerated, this);
+}
+
+void EcLogic::onMGenerated(EcPoint *m) {
+  context.m = *m;
+  // n = u2 * pub
+  g_point_mult_service.start(g_serverPubKey, context.u2.val,
+                             (callback_t)&EcLogic::onNGenerated, this);
+}
+
+void EcLogic::onNGenerated(EcPoint *n) {
+  // P = m + n
+  g_point_add_service.start(context.m, *n, (callback_t)&EcLogic::finalizeVerify,
+                            this);
+}
+
+void EcLogic::finalizeVerify(EcPoint *P) {
+  // P == identity -> signature is invalid
+  // otherwise, check if r == P.x
+  callback(callback_arg1,
+           (void *)(!P->identity() && context.r.val == P->xval()));
   busy = false;
 }
 
@@ -413,7 +488,7 @@ bool EcLogic::GetPublicKey(uint8_t *buffer) {
 EcLogic::EcLogic()
     : privateKey(0), publicKeyReady(0), busy(false),
       genRandTask(800, (callback_t)&EcLogic::genRand, this),
-      finalizeTask(800, (callback_t)&EcLogic::finalize, this) {}
+      finalizeTask(800, (callback_t)&EcLogic::finalizeSign, this) {}
 
 void EcLogic::SetPrivateKey(uint64_t privkey) {
   privateKey = privkey;

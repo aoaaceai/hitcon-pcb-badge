@@ -171,25 +171,40 @@ extern PointMultService g_point_mult_service;
 struct EcContext {
   // hash of the message
   uint64_t z;
+  // signature
+  ModNum r, s;
+  /* --- Signing context --- */
   // a random value
   uint64_t k;
-  // result of the sign
-  ModNum r, s;
+  /* --- Verifying context --- */
+  ModNum u1, u2;
+  // temporal storage for a point
+  EcPoint m;
   EcContext();
 };
 
 }  // namespace internal
 
 struct Signature {
-  internal::EcPoint pub;
   uint64_t r, s;
 
   /**
    * Dump the signature to a buffer. Buffer should be at least
    * ECC_SIGNATURE_SIZE. This function does not perform any size checks! Caller
    * is responsible for it.
+   *
+   * @param buffer: The buffer to write the signature to.
    */
   void toBuffer(uint8_t *buffer) const;
+
+  /**
+   * Load the signature from a buffer. Buffer should be at least
+   * ECC_SIGNATURE_SIZE. This funciton does not perform any size checks!
+   * Caller is responsible for it.
+   *
+   * @param buffer: The buffer containing the signature.
+   */
+  void fromBuffer(const uint8_t *buffer);
 };
 
 class EcLogic {
@@ -216,19 +231,42 @@ class EcLogic {
 
   /**
    * Start the signing process and mark this API as busy.
-   * @param message: the message to sign. The contents should be intact until
-   *                 sign finishes.
-   * @param len: length of message, has to be a multiple of 8
-   * @param callback: callback function to call when the sign is complete.
-   *                  the second argument to callback is a pointer to
-   *                  tmpSignature.
-   * @param callbackArg1: the first argument to the callback. Normally a pointer
-   * to "this" if the callback is a method, and nullptr if the callback is a
-   * function.
-   * @return whether the job is successfully queued.
+   *
+   * @param message:      the message to sign. The contents should be intact
+   *                      until sign finishes.
+   * @param len:          length of message.
+   * @param callback:     callback function to call when the sign is complete.
+   *                      The second argument to callback is a pointer to
+   *                      tmpSignature.
+   * @param callbackArg1: The first argument to the callback. Normally a
+   *                      pointer to "this" if the callback is a method, and
+   *                      nullptr if the callback is a function.
+   * @return              whether the job is successfully queued.
    */
   bool StartSign(uint8_t const *message, uint32_t len, callback_t callback,
                  void *callbackArg1);
+
+  /**
+   * Start the verification process and mark this API as busy.
+   * This will only verify the signature against the server public key.
+   *
+   * @param message:      the message to verify. The contents should be intact
+   *                      until verify finishes.
+   * @param len:          length of message.
+   * @param signature:    The signature to verify in raw form. Must be
+   *                      ECC_SIGNATURE_SIZE bytes in size. This function does
+   *                      not perform size checks! Caller is responsible.
+   * @param callback:     callback function to call when verification is
+   *                      complete.
+   *                      The second argument to callback is a boolean value
+   *                      indicating whether the signature is valid or not.
+   * @param callbackArg1: The first argument to the callback. Normally a
+   *                      pointer to "this" if the callback is a method, and
+   *                      nullptr if the callback is a function.
+   * @return              whether the job is successfully queued.
+   */
+  bool StartVerify(uint8_t const *message, uint32_t len, uint8_t *signature,
+                   callback_t callback, void *callbackArg1);
 
  private:
   /**
@@ -265,10 +303,16 @@ class EcLogic {
   hitcon::ecc::internal::EcContext context;
 
   void genRand();
-  void onHashFinish(hitcon::hash::HashResult *hashResult);
+  void onSignHashFinish(hitcon::hash::HashResult *hashResult);
+  void onVerifyHashFinish(hitcon::hash::HashResult *hashResult);
   void onRGenerated(internal::EcPoint *p);
   void onSGenerated(internal::ModNum *s);
-  void finalize();
+  void finalizeSign();
+  void onU1Generated(internal::ModNum *u1);
+  void onU2Generated(internal::ModNum *u2);
+  void onMGenerated(internal::EcPoint *m);
+  void onNGenerated(internal::EcPoint *n);
+  void finalizeVerify(internal::EcPoint *P);
 
   void onPubkeyDone(internal::EcPoint *p);
 
