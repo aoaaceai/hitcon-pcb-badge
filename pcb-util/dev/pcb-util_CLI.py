@@ -46,7 +46,7 @@ def thread_create(st_obj):
     return stop_event, my_thread
 
 
-def main_loop(stdscr):
+def main_loop(stdscr: curses.window):
     """main logic for cli interactive interface"""
 
     thread_pool = []  # store all thread instance, a thread == a STLINK work loop
@@ -72,8 +72,8 @@ def main_loop(stdscr):
     try:
         stlink_sn_list = shared_info.list_stlink()
     except ValueError as e:
-                print(f"Invalid ST-Link SN: {e}")
-                st_obj.current_state = fw_flash.ST_STATUS.NO_DEVICE
+        print(f"Invalid ST-Link SN: {e}")
+        raise e
 
     stlink_alive_sn_list = stlink_sn_list
     st_obj_list = []
@@ -108,14 +108,12 @@ def main_loop(stdscr):
                 0, 0, "====== WANRING: Lost Log Server Conenction, Reconnecting ======"
                 , curses.color_pair(1)
             )
-            st_obj.current_state = fw_flash.ST_STATUS.NO_DEVICE
         
         if fw_flash.flag_FwElfNotFound:
             stdscr.addstr(
                 0, 0, "====== WANRING: fw.elf not found, Check the folder an restart again ======"
                 , curses.color_pair(1)
             )
-            st_obj.current_state = fw_flash.ST_STATUS.NO_DEVICE
             
 
         ## list all current avaliable stlink

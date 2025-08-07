@@ -13,11 +13,13 @@ from enum import Enum, auto
 import ReplaceELF
 import configparser
 import os
+from typing import Tuple, ClassVar
 
 # Global
 flag_HTTPServerConnnectionError = False
 flag_FwElfNotFound = False
 PerBoardSecret = []
+PrivKey: bytes = b''
 
 # Read the .ini file
 config = configparser.ConfigParser()
@@ -43,7 +45,7 @@ class ST_STATUS(Enum):
     FINISHED = auto()
 
 #--- interface to use STM32CubeProgrammer by command---
-def run_command(cmd) -> [str, str]:
+def run_command(cmd) -> Tuple[str, str]:
     process = subprocess.Popen(
         cmd, shell=True, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, errors='ignore')
@@ -85,11 +87,14 @@ class ST_CONFIG():
 # The class of each STLINK
 class STLINK():
     #--- shared variables ---
-    _config = None
+    _config: ClassVar[ST_CONFIG]
+    _class_initialized: ClassVar[bool] = False
+
     @classmethod
-    def initialize_shared(cls, value):
-        if cls._config is None:
+    def initialize_shared(cls, value: ST_CONFIG):
+        if not cls._class_initialized:
             cls._config = value
+            cls._class_initialized = True
 
     #--- constructor ---
     def __init__(self, SN):

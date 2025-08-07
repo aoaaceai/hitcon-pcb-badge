@@ -130,7 +130,7 @@ def replace_array_in_elf(elf_file_path, search_array, replace_array):
     with open(elf_file_path, 'r+b') as f:
         array_offset, _ = find_array_in_elf(elf_file_path, search_array)
         if array_offset is None:
-            print("Array not found in the ELF file.")
+            raise ValueError("Array not found in the ELF file.")
 
         # Seek to the offset and replace the array
         f.seek(array_offset)
