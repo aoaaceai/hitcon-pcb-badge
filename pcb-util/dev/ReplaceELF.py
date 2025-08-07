@@ -36,8 +36,6 @@ if TEAM not in ['BLUE', 'RED']:
 def verify_server_priv_key():
     curve, G, order = ecc.mysecp()
     pubkey = (SERVER_PRIV_KEY * G).compact()
-    print(f'{pubkey=}')
-    print(f'{SERVER_PUB_KEY=}')
     if pubkey != SERVER_PUB_KEY:
         raise ValueError("Invalid SERVER_PRIV_KEY or SERVER_PUB_KEY in config.ini.")
 
@@ -195,37 +193,15 @@ def modify_fw_elf():
     return replace_array_PerBoardSecret, replace_array_PrivKey
 
 if __name__ == "__main__":
-
-    # Generate Random array
-    replace_array_PerBoardRandom = np.random.randint(0, 256, size=16, dtype=np.uint8)
-    replace_array_PerBoardSecret = np.random.randint(0, 256, size=16, dtype=np.uint8)
-
-    # Print random array
-    print("\n Geerating PerBoardRandom... \n")
-    print_array_in_hex(replace_array_PerBoardRandom)
-    print("\n Geerating PerBoardSecret... \n")
-    print_array_in_hex(replace_array_PerBoardSecret)
+    replace_array_PerBoardSecret, replace_array_PrivKey = modify_fw_elf()
 
     # TODO: Test posting PerBoardSecret to Cloud
-    print("\n POST PerBoardSecret to https://pcb-log.hitcon2024.online/log_board \n")
+    print(f"\n POST PerBoardSecret to {post_url}\n")
 
-    response = http_post_data(post_url, replace_array_PerBoardSecret)
+    response = http_post_data(post_url, replace_array_PerBoardSecret, replace_array_PrivKey)
     if response == 200:
         print("HTTP POST Success!")
     else:
         print(f"Error: {response}")
-
-    # Duplicate the ELF file
-    duplicate_elf_file(original_elf_path, MOD_elf_path)
-
-    print("\n Operating fwMOD.elf...... \n")
-
-    # find and replace PerBoardRandom array
-    search_and_reaplce_array(MOD_elf_path, search_array_PerBoardRandom, replace_array_PerBoardRandom)
-    print("\n PerBoardRandom replacement verified \n")
-
-    # find and replace PerBoardSecret array
-    search_and_reaplce_array(MOD_elf_path, search_array_PerBoardSecret, replace_array_PerBoardSecret)
-    print("\n PerBoardSecret replacement verified \n")
 
     print("\n Operation Done \n")

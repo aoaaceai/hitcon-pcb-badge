@@ -31,7 +31,7 @@ simulation = st.container()
 # Define the function to update ST_STATUS display in UI
 def update_state(state_to_update):
     st.session_state.box_color = color[state_to_update]
-    
+
     with status:
         st.markdown(
             f"""
@@ -56,7 +56,7 @@ def update_state(state_to_update):
 
 # Display initial message
 with description:
-    st.header("HITCON 2024 FW Flasher(Singledrop)")
+    st.header("HITCON 2025 FW Flasher(Singledrop)")
     st.write("Click the buttons to flash firmware with ST-Link")
 
 with status:
@@ -81,22 +81,22 @@ with progress_text:
 # Set path of the files
 with path:
     FW_ELF_PATH = st.text_input("Path of FW to be flashed (.elf) ")
-    
+
     # Check if the file name ends with ".elf"
     if FW_ELF_PATH.endswith(".elf"):
         st.success("valid path")
     else:
         st.error("FW path should end with .elf")
-    
+
     ST_PROGRAMMER_PATH = st.text_input("Directory Path of ST programmer(.exe)")
-    
+
     ST_PRO_PATH, ST_PRO_EXE = os.path.split(ST_PROGRAMMER_PATH)
     # Check if the file name ends with ".exe"
     if ST_PRO_EXE.endswith(".exe"):
         st.success("valid path")
     else:
         st.error("ST_PROGRAMMER path should end with .exe")
-    
+
     # Test if path is correctly parsed
     st.markdown("**FW_ELF_PATH**")
     st.write(FW_ELF_PATH)

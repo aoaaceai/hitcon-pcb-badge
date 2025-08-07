@@ -258,5 +258,5 @@ def gen_key(server_priv_key, parity):
             break
     privkey_size = (order.bit_length() + 7 ) // 8
     privkey_bytes = privkey.to_bytes(privkey_size, 'little')
-    pub_key_cert = server.sign(pubkey.compact())
+    pub_key_cert = server.sign(pubkey.compact()).compact()
     return privkey_bytes, pub_key_cert
