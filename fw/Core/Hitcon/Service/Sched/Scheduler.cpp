@@ -26,14 +26,15 @@ bool Scheduler::Queue(Task *task, void *arg) {
   my_assert(task);
   task->SetArg(arg);
   bool result = true;
-  // TODO: Disable Interrupt.
   __disable_irq();
-  if (!tasksAddQueue.PushBack(task)) {
+  if (tasksAddQueue.PushBack(task)) {
+    task->EnterQueue();
+  }
+  else {
     // Overflow, we need to drop this request.
     result = false;
     AssertOverflow();
   }
-  // TODO: Enable Interrupt.
   __enable_irq();
   return result;
 }
@@ -42,14 +43,15 @@ bool Scheduler::Queue(DelayedTask *task, void *arg) {
   my_assert(task);
   task->SetArg(arg);
   bool result = true;
-  // TODO: Disable Interrupt.
   __disable_irq();
-  if (!delayedTasksAddQueue.PushBack(task)) {
+  if (delayedTasksAddQueue.PushBack(task)) {
+    task->EnterQueue();
+  }
+  else {
     // Overflow, we need to drop this request.
     result = false;
     AssertOverflow();
   }
-  // TODO: Enable Interrupt.
   __enable_irq();
   return result;
 }
@@ -70,11 +72,12 @@ bool Scheduler::EnablePeriodic(PeriodicTask *task) {
     return false;
   }
   if (currentTask != task) {
-    bool ret = delayedTasks.Add(task);
-    if (!ret) {
-      AssertOverflow();
-    } else {
+    if (delayedTasks.Add(task))
       task->EnterQueue();
+    else {
+      // Heap is full, we need to drop this request.
+      AssertOverflow();
+      return false;
     }
   }
   task->Enable();
@@ -91,16 +94,9 @@ bool Scheduler::DisablePeriodic(PeriodicTask *task) {
     return false;
   }
   DelayedHouseKeeping();
-  {
-    bool removed = tasks.Remove(task);
-    if (removed) {
-      task->ExitQueue();
-    }
-    removed = delayedTasks.Remove(task);
-    if (removed) {
-      task->ExitQueue();
-    }
-  }
+  bool removed = tasks.Remove(task) || delayedTasks.Remove(task);
+  if (removed)
+    task->ExitQueue();
   task->Disable();
   return true;
 }
@@ -114,7 +110,6 @@ void Scheduler::DelayedHouseKeeping() {
       AssertOverflow();
       break;
     }
-    tasksAddQueue.Front()->EnterQueue();
     tasksAddQueue.PopFront();
   }
   while (!delayedTasksAddQueue.IsEmpty()) {
@@ -124,7 +119,6 @@ void Scheduler::DelayedHouseKeeping() {
       AssertOverflow();
       break;
     }
-    delayedTasksAddQueue.Front()->EnterQueue();
     delayedTasksAddQueue.PopFront();
   }
   unsigned now = SysTimer::GetTime();
