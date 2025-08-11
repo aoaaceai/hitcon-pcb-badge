@@ -251,6 +251,8 @@ class TamaApp : public App {
   bool _xb_qte_me_winning = false;
   bool _xb_qte_enemy_winning = false;
 
+  bool _received_restore_packet = false;
+
   TamaQte qte;
 
   // This level is displayed on the UI
@@ -317,6 +319,9 @@ class TamaApp : public App {
   bool TrySendSave(bool force);
   bool OnRestorePacket(struct hitcon::ir::RestorePetPacket* pkt);
   bool IsDataValid();
+
+  void ResetRestorePacketPoll();
+  bool PollRestorePacket();
 };
 
 void SetSingleplayer();
