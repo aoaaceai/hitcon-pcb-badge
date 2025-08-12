@@ -52,6 +52,8 @@ void IrxbBridge::OnXBoardBasestnConnect() {
 
   tama_state_ = TamaState::kTamaStateInit;
   score_state_ = ScoreState::kScoreStateInit;
+  tama_app.ResetRestorePacketPoll();
+  show_name_app.ResetSetScorePacketPoll();
 
   routine_task_.SetWakeTime(SysTimer::GetTime() + kIrxbDelayTime);
   service::sched::scheduler.Queue(&routine_task_, nullptr);
