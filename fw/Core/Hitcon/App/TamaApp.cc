@@ -1203,13 +1203,9 @@ bool TamaApp::IsDataValid() {
   return true;
 }
 
-void TamaApp::ResetRestorePacketPoll() {
-  _received_restore_packet = false;
-}
+void TamaApp::ResetRestorePacketPoll() { _received_restore_packet = false; }
 
-bool TamaApp::PollRestorePacket() {
-  return _received_restore_packet;
-}
+bool TamaApp::PollRestorePacket() { return _received_restore_packet; }
 
 bool TamaApp::TrySendSave(bool force) {
   int secret_level = SecretLevelFromSponsor(_tama_data.sponsor_register);
@@ -1236,7 +1232,7 @@ bool TamaApp::TrySendSave(bool force) {
 }
 
 bool TamaApp::OnRestorePacket(struct hitcon::ir::RestorePetPacket* pkt) {
-  self._received_restore_packet = true;
+  _received_restore_packet = true;
   return RestoreFromBuffer(pkt->pet_data);
 }
 

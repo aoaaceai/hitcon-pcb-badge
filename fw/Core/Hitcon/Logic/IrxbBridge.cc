@@ -1,12 +1,12 @@
 #include <App/ConnectMenuApp.h>
 #include <Logic/Display/display.h>
+#include <Logic/EcLogic.h>
+#include <Logic/GameController.h>
 #include <Logic/IrLogic.h>
 #include <Logic/IrxbBridge.h>
 #include <Service/Sched/Scheduler.h>
 #include <Service/Sched/SysTimer.h>
 #include <Util/uint_to_str.h>
-#include <Logic/EcLogic.h>
-#include <Logic/GameController.h>
 
 #include <algorithm>
 
@@ -14,13 +14,12 @@ using hitcon::service::sched::SysTimer;
 using namespace hitcon::ir_xb_bridge;
 using hitcon::ecc::g_ec_logic;
 
-
 namespace hitcon {
 
 namespace {
 constexpr unsigned kIrxbDelayTime = 100;
 constexpr int kIrxbShowCyclesStart = 60;
-constexpr int kIrxbShowCyclesExtra = 50;
+constexpr int kIrxbShowCyclesExtra = 70;
 constexpr unsigned kStateBase = 32;
 constexpr unsigned kStateTxEnd = kStateBase + 16 * ir::RETX_QUEUE_SIZE;
 constexpr unsigned kStateMenu = 2;
@@ -160,29 +159,31 @@ void IrxbBridge::TamaRoutine() {
     tama_data_.ttl = 0;
     tama_data_.type = packet_type::kSavePet;
     tama_app.SaveToBuffer(tama_data_.opaq.save_pet.pet_data);
-    bool ret = g_game_controller.SetBufferToUsername(tama_data_.opaq.save_pet.user);
-    if (ret)
-      tama_state_ = TamaState::kTamaStateWaitSignStart;
+    bool ret =
+        g_game_controller.SetBufferToUsername(tama_data_.opaq.save_pet.user);
+    if (ret) tama_state_ = TamaState::kTamaStateWaitSignStart;
 
   } else if (tama_state_ == TamaState::kTamaStateWaitSignStart) {
     sizeof(tama_data_.opaq.save_pet) - ECC_SIGNATURE_SIZE;
-    bool ret = g_ec_logic.StartSign(reinterpret_cast<uint8_t *>(&tama_data_.opaq.save_pet), sizeof(tama_data_.opaq.save_pet) - ECC_SIGNATURE_SIZE, (callback_t)&IrxbBridge::OnTamaSignDone, this);
-    if (ret)
-      tama_state_ = TamaState::kTamastateWaitSignDone;
-  }
-  else if (tama_state_ == TamaState::kTamastateWaitSignDone) {
+    bool ret = g_ec_logic.StartSign(
+        reinterpret_cast<uint8_t *>(&tama_data_.opaq.save_pet),
+        sizeof(tama_data_.opaq.save_pet) - ECC_SIGNATURE_SIZE,
+        (callback_t)&IrxbBridge::OnTamaSignDone, this);
+    if (ret) tama_state_ = TamaState::kTamastateWaitSignDone;
+  } else if (tama_state_ == TamaState::kTamastateWaitSignDone) {
     // nop
-  }
-  else if (tama_state_ == TamaState::kTamaStateWaitSend) {
-    bool ret = service::xboard::g_xboard_logic.SendIRPacket(reinterpret_cast<uint8_t *>(&tama_data_), sizeof(tama_data_.opaq.save_pet) + hitcon::ir::IR_DATA_HEADER_SIZE);
-    if (ret)
-      tama_state_ = TamaState::kTamaStateWaitRestore;
-  }
-  else if (tama_state_ == TamaState::kTamaStateWaitRestore) {
+  } else if (tama_state_ == TamaState::kTamaStateWaitSend) {
+    bool ret = service::xboard::g_xboard_logic.SendIRPacket(
+        reinterpret_cast<uint8_t *>(&tama_data_),
+        sizeof(tama_data_.opaq.save_pet) + hitcon::ir::IR_DATA_HEADER_SIZE);
+    if (ret) tama_state_ = TamaState::kTamaStateWaitRestore;
+  } else if (tama_state_ == TamaState::kTamaStateWaitRestore) {
     // nop
-  }
-  else if (tama_state_ == TamaState::kTamaStateDone) {
+  } else if (tama_state_ == TamaState::kTamaStateDone) {
     // nop
+  } else {
+    // Invalid state, reset to init.
+    tama_state_ = TamaState::kTamaStateInit;
   }
 }
 
@@ -192,12 +193,35 @@ void IrxbBridge::OnTamaSignDone(hitcon::ecc::Signature *signature) {
 }
 
 void IrxbBridge::ScoreRoutine() {
-  // TODO: aoaaceai implement this!
+  // If we already received a score packet, skip to "done".
+  if (show_name_app.PollSetScorePacket())
+    score_state_ = ScoreState::kScoreStateDone;
+
+  if (score_state_ == ScoreState::kScoreStateInit) {
+    score_data_.ttl = 0;
+    score_data_.type = packet_type::kRequestScore;
+    bool ret = g_game_controller.SetBufferToUsername(
+        score_data_.opaq.request_score.user);
+    if (ret) score_state_ = ScoreState::kScoreStateWaitSendGetScore;
+  } else if (score_state_ == ScoreState::kScoreStateWaitSendGetScore) {
+    bool ret = hitcon::service::xboard::g_xboard_logic.SendIRPacket(
+        reinterpret_cast<uint8_t *>(&score_data_),
+        sizeof(score_data_.opaq.request_score) +
+            hitcon::ir::IR_DATA_HEADER_SIZE);
+    if (ret) score_state_ = ScoreState::kScoreStateWaitSetScore;
+  } else if (score_state_ == ScoreState::kScoreStateWaitSetScore) {
+    // nop
+  } else if (score_state_ == ScoreState::kScoreStateDone) {
+    // nop
+  } else {
+    // Invalid state, reset to init.
+    score_state_ = ScoreState::kScoreStateInit;
+  }
 }
 
-void IrxbBridge::OnPacketReceived(void* arg) {
-  service::xboard::PacketCallbackArg* packet_arg =
-      reinterpret_cast<service::xboard::PacketCallbackArg*>(arg);
+void IrxbBridge::OnPacketReceived(void *arg) {
+  service::xboard::PacketCallbackArg *packet_arg =
+      reinterpret_cast<service::xboard::PacketCallbackArg *>(arg);
 
   rx_cnt_++;
   show_cycles_ = std::max(show_cycles_, kIrxbShowCyclesExtra);

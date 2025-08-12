@@ -41,6 +41,9 @@ class ShowNameApp : public App {
 
   void check_update();
 
+  void ResetSetScorePacketPoll();
+  bool PollSetScorePacket();
+
  private:
   enum ShowNameMode mode = SHOW_INITIALIZE;
   void update_display();
@@ -50,6 +53,7 @@ class ShowNameApp : public App {
   char surprise_msg[kDisplayScrollMaxTextLen + 1];
   bool starting_up;
   unsigned last_disp_update = 0;
+  bool _received_set_score_packet = false;
 };
 
 extern ShowNameApp show_name_app;

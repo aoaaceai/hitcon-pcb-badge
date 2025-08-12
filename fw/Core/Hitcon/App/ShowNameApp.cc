@@ -90,6 +90,12 @@ void ShowNameApp::OnButton(button_t button) {
   }
 }
 
+void ShowNameApp::ResetSetScorePacketPoll() {
+  _received_set_score_packet = false;
+}
+
+bool ShowNameApp::PollSetScorePacket() { return _received_set_score_packet; }
+
 void ShowNameApp::check_update() {
   if (mode == SHOW_INITIALIZE) {
     // NOTE:if FR complete, load from NV storage
@@ -166,6 +172,7 @@ void ShowNameApp::SetMode(const enum ShowNameMode mode) {
 }
 
 void ShowNameApp::SetScore(uint32_t score) {
+  _received_set_score_packet = true;
   score_cache = score;
   update_display();
 }

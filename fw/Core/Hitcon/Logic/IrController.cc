@@ -12,6 +12,7 @@
 #include <Service/HashService.h>
 #include <Service/IrService.h>
 #include <Service/Sched/Scheduler.h>
+#include <Service/SignedPacketService.h>
 #include <stdlib.h>
 
 #include <cstring>
@@ -78,8 +79,7 @@ void IrController::OnPacketReceived(void* arg) {
     const uint8_t* user = g_game_controller.GetUsername();
     if (user &&
         memcmp(data->opaq.score_announce.user, user, IR_USERNAME_LEN) == 0) {
-      show_name_app.SetScore(
-          *reinterpret_cast<uint32_t*>(data->opaq.score_announce.score));
+      g_signed_packet_service.VerifyAndReceivePacket(packet);
     } else {
       // Not our score.
     }
@@ -87,7 +87,7 @@ void IrController::OnPacketReceived(void* arg) {
     const uint8_t* user = g_game_controller.GetUsername();
     if (user &&
         memcmp(data->opaq.restore_pet.user, user, IR_USERNAME_LEN) == 0) {
-      hitcon::app::tama::tama_app.OnRestorePacket(&data->opaq.restore_pet);
+      g_signed_packet_service.VerifyAndReceivePacket(packet);
     } else {
       // Not our pet.
     }

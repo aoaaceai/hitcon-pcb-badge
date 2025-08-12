@@ -1,10 +1,10 @@
 #ifndef HITCON_LOGIC_IRXB_BRIDGE_H_
 #define HITCON_LOGIC_IRXB_BRIDGE_H_
 
+#include <Logic/EcLogic.h>
 #include <Logic/IrController.h>
 #include <Logic/XBoardLogic.h>
 #include <Service/Sched/DelayedTask.h>
-#include <Logic/EcLogic.h>
 
 namespace hitcon {
 namespace ir_xb_bridge {
@@ -20,12 +20,12 @@ enum TamaState {
 
 enum ScoreState {
   kScoreStateInit = 0,
-  kScoreStateWaitGetScore,
-  kScoreStateWaitSet,
+  kScoreStateWaitSendGetScore,
+  kScoreStateWaitSetScore,
   kScoreStateDone,
 };
 
-}
+}  // namespace ir_xb_bridge
 
 class IrxbBridge {
  public:
@@ -44,7 +44,7 @@ class IrxbBridge {
   void ScoreRoutine();
   void OnPacketReceived(void* arg);
 
-  void OnTamaSignDone(hitcon::ecc::Signature *signature);
+  void OnTamaSignDone(hitcon::ecc::Signature* signature);
 
   hitcon::service::sched::DelayedTask routine_task_;
 
