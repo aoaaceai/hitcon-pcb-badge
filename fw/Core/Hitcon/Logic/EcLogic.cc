@@ -109,7 +109,7 @@ void ModMulService::routineFunc() {
       context.res = modadd(context.res, context.a, context.m);
     context.b <<= 1;
     ++context.i;
-  } while (context.i & 0b11111);
+  } while (context.i & 0b1111);
   if (context.i == 64)
     scheduler.Queue(&finalizeTask, nullptr);
   else
